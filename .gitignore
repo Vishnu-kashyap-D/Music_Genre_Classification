@@ -1,0 +1,36 @@
+# Virtual environments
+.venv/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.npz
+*.npy
+*.joblib
+
+# Model checkpoints / caches
+*.pt
+*.pth
+*.onnx
+torch_cache/
+torch_models/
+logs/
+genre_classifier.keras
+data.json
+
+# Datasets & archives
+Data/genres_original/
+Data/images_original/
+archive/
+archive.zip
+
+# OS/filesystem noise
+.DS_Store
+Thumbs.db
+
+# Audio scratch files
+*.wav
+*.mp3
