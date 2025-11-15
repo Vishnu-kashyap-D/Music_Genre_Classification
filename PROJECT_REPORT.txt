@@ -93,6 +93,39 @@ Layers / Components:
     Threshold / Top-3 summarisation (console, CSV, logs)
 
 ------------------------------------------------------------
+6A. MEL-SPECTROGRAM FEATURE EXPLANATION
+------------------------------------------------------------
+Why spectrograms?
+        • A mel-spectrogram converts raw waveform energy into a time–frequency heatmap that aligns
+            with human perception (mel scale). Each vertical column summarises one STFT frame, while each
+            horizontal row corresponds to a mel bin (e.g., 128 bins ≈ 0–11 kHz).
+        • CNNs excel at spotting local patterns (e.g., harmonic stacks, percussive ridges). Treating the
+            mel image as a 2D tensor lets convolutional kernels capture rhythmic and timbral cues.
+
+Generation pipeline:
+        1. Resample to 22.05 kHz mono.
+        2. Slice 5-second segments and compute STFT with `n_fft=2048`, `hop_length=512`.
+        3. Apply mel filter bank (128 bins) and convert power → dB (`librosa.power_to_db`).
+        4. Optionally run SpecAugment (time/frequency masking) during training for robustness.
+
+Usage inside PCNN:
+        • Each 15-second window supplies three mel slices. The mel branch of the PCNN consumes these
+            slices as `1 × 128 × T` tensors, passing through residual + SE blocks.
+        • Attention pooling learns which slices (intro, chorus, etc.) deserve more weight before logits
+            are produced.
+
+Figure 1: `docs/images/mel_spectrogram_example.png` shows a 5-second mel-spectrogram rendered via
+`docs/scripts/generate_spectrogram.py`. Bright ridges correspond to strong harmonics; darker zones
+indicate silence or low energy. Evaluators can regenerate the figure (or create new ones) by running:
+
+        (.venv) python docs/scripts/generate_spectrogram.py
+
+Including such spectrograms in reports or presentations helps illustrate what the network “sees” when
+deciding genres (e.g., guitar harmonics for rock, heavy low-frequency energy for hip-hop). Future
+reports can embed additional figures (before/after SpecAugment, attention heatmaps) using the same
+scripted workflow.
+
+------------------------------------------------------------
 7. SYSTEM REQUIREMENTS
 ------------------------------------------------------------
 Hardware:
