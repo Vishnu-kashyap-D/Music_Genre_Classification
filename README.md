@@ -1,6 +1,3 @@
-<<<<<<< Updated upstream
-# Music_Genre_Classification
-=======
 # Music Genre Classification (Parallel CNN + OpenL3)
 
 This repository now hosts a feature-rich multi-label genre classifier built around a parallel CNN
