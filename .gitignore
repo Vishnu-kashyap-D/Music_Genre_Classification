@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.pt
+*.pth
+*.keras
+*.h5
+*.pkl
+*.joblib
+*.npz
+torch_models/
+torch_cache/
+uploads/
+logs/
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.ogg
+archive.zip
+archive/
+Data/
+genres_original/
+*.csv
+data.json
+
+# Frontend build
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# Temporary files
+tmp_*
+*.tmp
+*.log
+
+# Large files
+*.zip
+*.tar.gz
+
