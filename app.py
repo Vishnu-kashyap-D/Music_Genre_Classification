@@ -23,21 +23,23 @@ matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 
 from train_parallel_cnn import (
+    DatasetConfig,
+    OpenL3Config,
     ParallelCNN,
     choose_device,
     load_openl3_model,
     compute_mel_slices,
 )
-# Make sure we import torchopenl3 if available for the load_openl3_model func
-try:
-    import torchopenl3
-except ImportError:
-    pass
 
-app = Flask(__name__)
+FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+# static_folder=None disables Flask's auto-registered static route, which would
+# otherwise collide with our own catch-all below and 404 before it gets a chance.
+app = Flask(__name__, static_folder=None)
 # Enhanced CORS configuration for better frontend-backend communication
-CORS(app, 
-     origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
+_default_origins = "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"
+_allowed_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()]
+CORS(app,
+     origins=_allowed_origins,
      methods=["GET", "POST", "OPTIONS"],
      allow_headers=["Content-Type"],
      supports_credentials=True)
@@ -83,7 +85,7 @@ def load_model():
     _mapping = payload["mapping"]
     meta = payload.get("meta", {})
     
-    # Load original config from checkpoint
+    # Load original config from checkpoint to the model 
     _cfg = DatasetConfig(
         window_duration=int(meta.get("window_duration", 15)),
         slice_duration=int(meta.get("slice_duration", 5)),
@@ -387,51 +389,31 @@ def process_3s_segments(
             )
             mel_db = librosa.power_to_db(mel, ref=np.max, top_db=None)
             mel_db = pad_or_truncate(mel_db, _cfg.expected_frames).astype(np.float32)
-            # Repeat same slice to satisfy model's expected shape (3, n_mels, time_frames)
-            segment_tensor = np.repeat(mel_db[None, ...], 3, axis=0)
+            # Repeat same slice to satisfy model's expected shape (3, 1, n_mels, time_frames)
+            segment_tensor = np.repeat(mel_db[None, None, ...], 3, axis=0)
             segments.append(segment_tensor)
             
         elif _feature_type == "openl3":
-            if _l3_model is None and _l3_config is None:
-                 raise RuntimeError("OpenL3 model not loaded.")
+            if _l3_model is None or _l3_config is None:
+                raise RuntimeError("OpenL3 model not loaded. Cannot process with openl3 feature type.")
             
-            # Try torchopenl3 first (Preferred)
             try:
-                import torchopenl3
-                embeddings, _ = torchopenl3.get_audio_embedding(
-                    slice_5s,
-                    sr=sample_rate,
-                    hop_size=_l3_config.hop_size,
-                    center=_l3_config.center,
-                    batch_size=_l3_config.batch_size,
-                    model=_l3_model,
-                )
-                 # torchopenl3 returns tensor
-                if hasattr(embeddings, "cpu"):
-                    embeddings = embeddings.cpu().numpy()
+                import openl3
             except ImportError:
-                 # Fallback to TF openl3
-                try:
-                    import openl3
-                    embeddings, _ = openl3.get_audio_embedding(
-                        slice_5s,
-                        sr=sample_rate,
-                        hop_size=_l3_config.hop_size,
-                        center=_l3_config.center,
-                        batch_size=_l3_config.batch_size,
-                        model=_l3_model,
-                    )
-                except ImportError:
-                     raise RuntimeError("Neither torchopenl3 nor openl3 is installed.")
-
+                raise RuntimeError("OpenL3 package not installed. Install with: pip install openl3")
+            
+            embeddings, _ = openl3.get_audio_embedding(
+                slice_5s,
+                sr=sample_rate,
+                hop_size=_l3_config.hop_size,
+                center=_l3_config.center,
+                batch_size=_l3_config.batch_size,
+                model=_l3_model,
+            )
             if embeddings.size == 0:
                 slice_emb = np.zeros(_l3_config.embedding_dim, dtype=np.float32)
             else:
-                 # Handle shape (1, Time, Dim) -> (Dim,)
-                if embeddings.ndim == 3:
-                     slice_emb = embeddings[0].mean(axis=0).astype(np.float32)
-                else: 
-                     slice_emb = embeddings.mean(axis=0).astype(np.float32)
+                slice_emb = embeddings.mean(axis=0).astype(np.float32)
             segment_tensor = np.tile(slice_emb, (3, 1))
             segments.append(segment_tensor)
         else:
@@ -675,7 +657,7 @@ def predict():
                     
                     # Predict
                     output = _model(tensor)
-                    probs = torch.sigmoid(output).cpu().numpy()[0]  # Shape: (num_classes,)
+                    probs = torch.softmax(output, dim=1).cpu().numpy()[0]  # Shape: (num_classes,)
                     
                     all_predictions.append(probs)
                     
@@ -748,6 +730,19 @@ def predict():
         return jsonify({"error": f"Server error: {error_msg}"}), 500
 
 
+if os.path.isdir(FRONTEND_DIST):
+    from flask import send_from_directory
+
+    @app.route("/", defaults={"path": ""})
+    @app.route("/<path:path>")
+    def serve_frontend(path):
+        """Serve the built React app; fall back to index.html for client-side routes."""
+        full_path = os.path.join(FRONTEND_DIST, path)
+        if path and os.path.isfile(full_path):
+            return send_from_directory(FRONTEND_DIST, path)
+        return send_from_directory(FRONTEND_DIST, "index.html")
+
+
 if __name__ == '__main__':
     print("Starting Flask server...")
     print("Loading model on startup...")
@@ -758,5 +753,7 @@ if __name__ == '__main__':
         print(f"Warning: Could not load model on startup: {e}")
         print("Model will be loaded on first request.")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "true").lower() == "true"
+    app.run(debug=debug, host='0.0.0.0', port=port)
 
