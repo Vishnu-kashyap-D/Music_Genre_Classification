@@ -90,16 +90,19 @@ export default function Analysis() {
     const errorToastId = 'analysis-error' // Use consistent ID to prevent duplicates
 
     try {
-      // Check backend health before making request
-      if (retryCount === 0) {
-        toast.loading('Connecting to server (may take up to a minute if it was idle)...', { id: 'health-check' })
+      // Check backend health before making request. Skipped in production
+      // (same-origin deployment): a spun-down free-tier host can take well
+      // over a minute just to import torch/librosa before it can answer
+      // anything, including this check, so gating on it here only adds a
+      // false-negative failure mode. The actual analyze request below already
+      // has its own generous timeout and error handling.
+      if (retryCount === 0 && API_ENDPOINTS.base) {
+        toast.loading('Checking backend connection...', { id: 'health-check' })
         const isHealthy = await checkBackendHealth()
         toast.dismiss('health-check')
 
         if (!isHealthy) {
-          const errorMsg = API_ENDPOINTS.base
-            ? `Backend server is not responding. Please ensure the backend is running:\n\n1. Open a terminal\n2. Navigate to the project directory\n3. Run: python app.py\n\nThe server should be running on ${API_ENDPOINTS.base}`
-            : 'The server did not respond in time. It may still be starting up after being idle - please wait a moment and try again.'
+          const errorMsg = `Backend server is not responding. Please ensure the backend is running:\n\n1. Open a terminal\n2. Navigate to the project directory\n3. Run: python app.py\n\nThe server should be running on ${API_ENDPOINTS.base}`
           setErrorMessage(errorMsg)
           setAnalysisState('error')
           // Dismiss any existing error toasts and show only one
@@ -109,7 +112,10 @@ export default function Analysis() {
         }
       }
 
-      toast.loading(`Analyzing audio${retryCount > 0 ? ` (retry ${retryCount}/${maxRetries})` : ''}...`, { id: 'analysis' })
+      const analyzingText = !API_ENDPOINTS.base && retryCount === 0
+        ? 'Analyzing audio (first request after idle can take a minute or two)...'
+        : `Analyzing audio${retryCount > 0 ? ` (retry ${retryCount}/${maxRetries})` : ''}...`
+      toast.loading(analyzingText, { id: 'analysis' })
       
       const formData = new FormData()
       formData.append('audio', file)
@@ -173,7 +179,9 @@ export default function Analysis() {
       if (error.name === 'AbortError') {
         friendlyMessage = 'Analysis request timed out after 5 minutes. The file might be too large or the server is slow. Please try with a smaller file or check your connection.'
       } else if (friendlyMessage.includes('Failed to fetch') || friendlyMessage.includes('NetworkError')) {
-        friendlyMessage = `Unable to reach the analysis server at ${API_ENDPOINTS.base}.\n\nPlease ensure:\n1. The backend is running (python app.py)\n2. The server is accessible from your browser\n3. There are no firewall issues blocking the connection`
+        friendlyMessage = API_ENDPOINTS.base
+          ? `Unable to reach the analysis server at ${API_ENDPOINTS.base}.\n\nPlease ensure:\n1. The backend is running (python app.py)\n2. The server is accessible from your browser\n3. There are no firewall issues blocking the connection`
+          : 'Unable to reach the analysis server. Please check your connection and try again.'
         
         // Retry if it's a network error and we haven't exceeded max retries
         if (retryCount < maxRetries) {
