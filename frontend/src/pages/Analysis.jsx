@@ -68,7 +68,9 @@ export default function Analysis() {
     try {
       const response = await fetch(API_ENDPOINTS.health, {
         method: 'GET',
-        signal: AbortSignal.timeout(5000), // 5 second timeout for health check
+        // Free-tier hosts (e.g. Render) can take 30-60s+ to wake a spun-down
+        // instance, so this needs real headroom rather than a quick local-dev check.
+        signal: AbortSignal.timeout(60000),
       })
       const data = await response.json()
       return data.status === 'healthy' || data.status === 'degraded'
@@ -90,12 +92,14 @@ export default function Analysis() {
     try {
       // Check backend health before making request
       if (retryCount === 0) {
-        toast.loading('Checking backend connection...', { id: 'health-check' })
+        toast.loading('Connecting to server (may take up to a minute if it was idle)...', { id: 'health-check' })
         const isHealthy = await checkBackendHealth()
         toast.dismiss('health-check')
-        
+
         if (!isHealthy) {
-          const errorMsg = `Backend server is not responding. Please ensure the backend is running:\n\n1. Open a terminal\n2. Navigate to the project directory\n3. Run: python app.py\n\nThe server should be running on ${API_ENDPOINTS.base}`
+          const errorMsg = API_ENDPOINTS.base
+            ? `Backend server is not responding. Please ensure the backend is running:\n\n1. Open a terminal\n2. Navigate to the project directory\n3. Run: python app.py\n\nThe server should be running on ${API_ENDPOINTS.base}`
+            : 'The server did not respond in time. It may still be starting up after being idle - please wait a moment and try again.'
           setErrorMessage(errorMsg)
           setAnalysisState('error')
           // Dismiss any existing error toasts and show only one
