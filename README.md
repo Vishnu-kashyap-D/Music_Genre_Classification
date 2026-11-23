@@ -123,6 +123,42 @@ npm install
 
 ---
 
+## 📈 Results
+
+**81.9% test accuracy on 199 held-out GTZAN tracks** (macro F1 0.81). Tracks were split into train/validation/test
+by track, not by slice, so no song appears on both sides. Predictions are aggregated per song (mean of slice scores).
+Source: `final_results/classification_report.csv` and `final_results/confusion_matrix.csv`.
+
+| Genre | Precision | Recall | F1 | Test tracks |
+| :--- | ---: | ---: | ---: | ---: |
+| blues | 0.79 | 0.95 | 0.86 | 20 |
+| classical | 1.00 | 1.00 | 1.00 | 20 |
+| country | 0.75 | 0.60 | 0.67 | 20 |
+| disco | 0.90 | 0.90 | 0.90 | 20 |
+| hiphop | 0.68 | 0.95 | 0.79 | 20 |
+| jazz | 0.89 | 0.84 | 0.86 | 19 |
+| metal | 0.91 | 1.00 | 0.95 | 20 |
+| pop | 0.75 | 0.90 | 0.82 | 20 |
+| reggae | 0.92 | 0.55 | 0.69 | 20 |
+| rock | 0.67 | 0.50 | 0.57 | 20 |
+
+**Confusion matrix** (rows = true genre, columns = predicted):
+
+| | blues | classical | country | disco | hiphop | jazz | metal | pop | reggae | rock |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **blues** | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
+| **classical** | 0 | 20 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **country** | 0 | 0 | 12 | 0 | 0 | 1 | 0 | 2 | 1 | 4 |
+| **disco** | 0 | 0 | 0 | 18 | 1 | 0 | 0 | 1 | 0 | 0 |
+| **hiphop** | 0 | 0 | 0 | 0 | 19 | 0 | 0 | 1 | 0 | 0 |
+| **jazz** | 0 | 0 | 3 | 0 | 0 | 16 | 0 | 0 | 0 | 0 |
+| **metal** | 0 | 0 | 0 | 0 | 0 | 0 | 20 | 0 | 0 | 0 |
+| **pop** | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 18 | 0 | 0 |
+| **reggae** | 1 | 0 | 0 | 0 | 5 | 1 | 0 | 2 | 11 | 0 |
+| **rock** | 4 | 0 | 1 | 2 | 1 | 0 | 2 | 0 | 0 | 10 |
+
+Weakest genres are rock (often confused with blues) and reggae (often confused with hip-hop).
+
 ## 0. Get the Code (Advanced)
 
 ```powershell

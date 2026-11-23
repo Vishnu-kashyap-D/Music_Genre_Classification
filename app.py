@@ -108,7 +108,7 @@ def load_model():
         except (ImportError, RuntimeError) as e:
             print(f"WARNING: OpenL3 not available: {e}")
             print("Falling back to mel features. Install OpenL3 if you need openl3 feature type.")
-            print("See INSTALL_OPENL3.md for installation instructions.")
+            print("See README.md, section 1 (Environment Setup), for installation instructions.")
             # Fallback to mel if OpenL3 is not available
             _feature_type = "mel"
     
